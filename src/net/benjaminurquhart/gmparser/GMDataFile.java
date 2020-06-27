@@ -44,10 +44,20 @@ public class GMDataFile {
 	private int gamemakerVersion = 1;
 	private String game = "???";
 	
+	private Set<File> audioSupplements;
+	private boolean autoAudioSearch;
+	private boolean missingAudio;
+	
 	public GMDataFile(File file) {
 		this(file, file.getParentFile());
 	}
 	public GMDataFile(File file, File assetsFolder) {
+		this(file, assetsFolder, false);
+	}
+	public GMDataFile(File file, boolean autoAudioSearch) {
+		this(file, null, autoAudioSearch);
+	}
+	public GMDataFile(File file, File assetsFolder, boolean autoAudioSearch) {
 		if(file == null) {
 			throw new IllegalArgumentException("file cannot be null");
 		}
@@ -67,6 +77,7 @@ public class GMDataFile {
 			throw new IllegalArgumentException("asset folder is a file: " + assetsFolder.getAbsolutePath());
 		}
 		try {
+			this.autoAudioSearch = autoAudioSearch;
 			this.folder = assetsFolder;
 			this.file = file;
 			
@@ -446,6 +457,11 @@ public class GMDataFile {
 			group = info.group;
 			embedded = flags.contains(AudioResource.Flag.EMBEDDED) || flags.contains(AudioResource.Flag.COMPRESSED);
 			
+			if(index >= this.audio.size()) {
+				missingAudio = true;
+				break;
+			}
+			
 			if(embedded) {
 				audio = this.audio.get(index++);
 			}
@@ -506,8 +522,22 @@ public class GMDataFile {
 			}
 		}
 		
+		if(!this.autoAudioSearch && !this.isMissingAudio()) {
+			return;
+		}
+		
 		try {
-			File[] files = folder.listFiles(file -> !file.isDirectory() && !file.equals(this.file));
+			File[] files = null;
+			if(audioSupplements == null || audioSupplements.isEmpty()) {
+				files = folder.listFiles(file -> !file.isDirectory() && !file.equals(this.file));
+			}
+			if(this.autoAudioSearch) {
+				files = new File[audioSupplements.size()];
+				files = audioSupplements.toArray(files);
+			}
+			if(files == null) {
+				return;
+			}
 			IFFChunk chunk;
 			IFFFile data;
 			
@@ -616,16 +646,57 @@ public class GMDataFile {
 		return game;
 	}
 	
+	public boolean addAudioResourceFile(File file) {
+		if(!this.isMissingAudio()) {
+			throw new IllegalStateException("no missing audio files were reported");
+		}
+		if(file == null) {
+			throw new IllegalArgumentException("file cannot be null");
+		}
+		if(!file.exists()) {
+			throw new IllegalArgumentException("file not found: " + file.getAbsolutePath());
+		}
+		if(file.isDirectory()) {
+			throw new IllegalArgumentException("provided file is a directory");
+		}
+		if(audioSupplements == null) {
+			audioSupplements = new HashSet<>();
+		}
+		return audioSupplements.add(file);
+	}
+	public void setAutoAudioSearch(boolean value) {
+		this.autoAudioSearch = value;
+	}
+	public boolean willAutoSearchAudio() {
+		return autoAudioSearch;
+	}
+	public void reloadAudio() {
+		this.initAudioGroups();
+		this.initAudio();
+		
+		this.initSoundMetadata();
+	}
+	public boolean isMissingAudio() {
+		return missingAudio;
+	}
+	
 	@Override
 	public String toString() {
-		return String.format(
-				"File: %s\nAssets Folder: %s\nGame: %s\nGame Maker Version: %d\n%s\n",
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format(
+				"File: %s\nAssets Folder: %s\nGame: %s\nGame Maker Version: %d\n%sSummary:\n",
 				file.getAbsolutePath(),
 				folder.getAbsolutePath(),
 				game, 
 				gamemakerVersion,
 				buildRecursiveTree(resources.getChunks())
-		);
+		));
+		sb.append(String.format("Audio Tracks: %5d\n", audio.size()));
+
+		sb.append(String.format("Textures:     %5d\n", textures.size()));
+		sb.append(String.format("Sprites:      %5d\n", sprites.size()));
+		sb.append(String.format("Strings:      %5d\n", strings.size()));
+		return sb.toString();
 	}
 	
 	private static String buildRecursiveTree(List<IFFChunk> chunks) {
