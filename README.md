@@ -1,6 +1,12 @@
 # GameMaker-Parser
 Library to parse GameMaker archives. Supports Game Maker 1 & 2 (Partial 2.3)
 
+This project is still a work in progress. You can help by installing some of the games below and reverse-engineering the data file (data.win, game.ios, or game.unx)
+# Some games
+- [ROSEBLIGHT](https://aplovestudio.itch.io/roseblight) (GM 2.3 beta) - Working (broken audio groups)
+- [DELTARUNE](https://deltarune.com) (GM 2.0) - Working
+- [UNDERTALE](https://undertale.com) (GM 1.0) (Paid) - Working
+
 # What can be parsed so far
 - Strings
 - Audio (mostly complete)
