@@ -1,5 +1,5 @@
 # GameMaker-Parser
-Library to parse GameMaker archives. Supports Game Maker 1 & 2 (NOT 2.3)
+Library to parse GameMaker archives. Supports Game Maker 1 & 2 (Partial 2.3)
 
 # What can be parsed so far
 - Strings

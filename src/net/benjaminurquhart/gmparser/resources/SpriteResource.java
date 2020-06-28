@@ -14,8 +14,8 @@ public class SpriteResource extends Resource {
 	private TPAGResource[] tpags;
 	private StringResource name;
 	
+	private byte[] bytes, animation;
 	private int[] tpagOffsets;
-	private byte[] bytes;
 	
 	private int nameOffset;
 	
@@ -74,6 +74,15 @@ public class SpriteResource extends Resource {
 	}
 	public TPAGResource[] getTPAGInfo() {
 		return Arrays.copyOf(tpags, tpags.length);
+	}
+	public byte[] getAsGIF() {
+		if(animation == null) {
+			animation = this.getAsGIF(1);
+		}
+		return Arrays.copyOf(animation, animation.length);
+	}
+	public byte[] getAsGIF(int scale) {
+		return GIFCreator.create(this, scale);
 	}
 	@Override
 	public byte[] getBytes() {

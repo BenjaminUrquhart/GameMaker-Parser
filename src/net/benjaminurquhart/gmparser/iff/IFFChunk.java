@@ -1,6 +1,5 @@
 package net.benjaminurquhart.gmparser.iff;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -13,6 +12,10 @@ public class IFFChunk {
 	private IFFFile subChunks, origin;
 	private IFFChunk parent;
 	private long offset;
+	
+	public static boolean isValidOffset(long offset) {
+		return (offset&3) == 0;
+	}
 	
 	protected IFFChunk(String typeID, byte[] contents, IFFFile origin, long offset) {
 		this(typeID, contents, (IFFChunk) null, offset);
@@ -62,14 +65,35 @@ public class IFFChunk {
 		return subChunks == null ? null : subChunks.getChunk(typeID);
 	}
 	public int readInt(int offset) {
-		byte[] bytes = Arrays.copyOfRange(contents, offset, offset+4);
+		byte[] bytes = new byte[4];
+		this.read(offset, 4, bytes);
+		
 		return ((bytes[3]&0xff)<<24)|((bytes[2]&0xff)<<16)|((bytes[1]&0xff)<<8)|(bytes[0]&0xff);
 	}
 	public void read(int offset, int length, byte[] dest) {
 		this.read(offset, length, dest, 0);
 	}
 	public void read(int offset, int length, byte[] dest, int destOffset) {
+		if(offset < 0) {
+			throw new IllegalArgumentException(String.format("Relative offset %d (0x%08x) < 0", offset, offset));
+		}
+		if(length < 1) {
+			throw new IllegalArgumentException("Length " + length + " < 1");
+		}
+		if(!this.isWithinBounds(offset+length)) {
+			throw new IllegalArgumentException(String.format(
+					"provided offset and length extends beyond chunk boundaries (%d (0x%08x) + %d >= %d, chunk = %s)",
+					offset,
+					offset,
+					length,
+					contents.length,
+					typeID
+			));
+		}
 		System.arraycopy(contents, offset, dest, destOffset, length);
+	}
+	public boolean isWithinBounds(long offset) {
+		return offset >= 0 && offset < contents.length;
 	}
 	@Override
 	public String toString() {

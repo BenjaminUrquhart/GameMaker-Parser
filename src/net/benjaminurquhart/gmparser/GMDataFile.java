@@ -41,7 +41,7 @@ public class GMDataFile {
 	
 	private long absoluteStringOffset, absoluteTextureOffset, absoluteSpriteOffset, absoluteAudioOffset, absoluteTPAGOffset, absoluteAudioMetaOffset;
 	
-	private int gamemakerVersion = 1;
+	private int gameMakerVersion = 1, gameMakerMinor = 0;
 	private String game = "???";
 	
 	private Set<File> audioSupplements;
@@ -105,7 +105,8 @@ public class GMDataFile {
 			
 			try {
 				IFFChunk meta = main.getSubChunk("GEN8");
-				gamemakerVersion = meta.readInt(44);
+				gameMakerVersion = meta.readInt(44);
+				gameMakerMinor = meta.readInt(48);
 				
 				StringResource name = getStringFromAbsoluteOffset(meta.readInt(40));
 				game = name.getString();
@@ -123,9 +124,11 @@ public class GMDataFile {
 			initSoundMetadata();
 		}
 		catch(RuntimeException e) {
+			System.err.printf("Error while processing game '%s' (GM Version %d.%d)\n", game, gameMakerVersion, gameMakerMinor);
 			throw e;
 		}
 		catch(Throwable e) {
+			System.err.printf("Error while processing game '%s' (GM Version %d.%d)\n", game, gameMakerVersion, gameMakerMinor);
 			throw new RuntimeException(e);
 		}
 	}
@@ -194,7 +197,7 @@ public class GMDataFile {
 		int fileOffset = num*4;
 		TextureResource resource;
 		
-		int objectLength = gamemakerVersion == 2 ? 12 : 8;
+		int objectLength = gameMakerVersion == 2 ? 12 : 8;
 		
 		List<Long> offsets = new ArrayList<>(), lengths = new ArrayList<>();
 		for(int i = 0; i < num; i++) {
@@ -276,7 +279,8 @@ public class GMDataFile {
 		int num = spriteChunk.readInt(0), offset, relativeOffset, nameOffset = -1;
 		int[] tpagOffsets;
 		
-		int tpagTableOffset = gamemakerVersion == 2 ? 76 : 56;
+		int tpagTableOffset = 56;
+		boolean foundRealTPAG = gameMakerVersion == 1;
 		
 		SpriteResource resource;
 		for(int i = 0; i < num; i++) {
@@ -285,10 +289,26 @@ public class GMDataFile {
 			
 			try {
 				nameOffset = spriteChunk.readInt(relativeOffset);
+				
+				// GameMaker 2.3 puts an extra byte in the sprite data, meaning we have to find
+				// a new TPAG offset. Thanks.
+				if(!foundRealTPAG) {
+					int tmp = spriteChunk.readInt(relativeOffset+tpagTableOffset);
+					if(tmp == -1) {
+						tpagTableOffset += 16 + spriteChunk.readInt(relativeOffset+tpagTableOffset+4)*4;
+					}
+					else {
+						tpagTableOffset += 20;
+					}
+					foundRealTPAG = true;
+				}
 				tpagOffsets = new int[spriteChunk.readInt(relativeOffset+tpagTableOffset)];
+				
+				//System.out.printf("Num offsets: %d (0x%08x)\n", tpagOffsets.length, tpagOffsets.length);
 				
 				for(int j = 0; j < tpagOffsets.length; j++) {
 					tpagOffsets[j] = spriteChunk.readInt(relativeOffset+tpagTableOffset+4*(j+1));
+					//System.out.printf("0x%08x\n", tpagOffsets[j]);
 				}
 				resource = new SpriteResource(this, spriteChunk, nameOffset, tpagOffsets, relativeOffset);
 				spriteTable.put(resource.getName().getString(), resource);
@@ -335,8 +355,11 @@ public class GMDataFile {
 			audioGroups.add(resource);
 			return;
 		}
+		StringResource name;
+		int nameOffset;
 		for(int i = 0; i < num; i++) {
-			resource = new AudioGroupResource(getStringFromAbsoluteOffset(audioGroupChunk.readInt(8+4*(i+1))), i);
+			name = getStringFromAbsoluteOffset(nameOffset = audioGroupChunk.readInt(8+4*(i+1)));
+			resource = new AudioGroupResource(name == null ? String.format("Missing String @ 0x%08x", nameOffset) : name.getString(), i);
 			audioGroupTable.put(resource.getName(), resource);
 			audioGroups.add(resource);
 		}
@@ -684,11 +707,12 @@ public class GMDataFile {
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append(String.format(
-				"File: %s\nAssets Folder: %s\nGame: %s\nGame Maker Version: %d\n%sSummary:\n",
+				"File: %s\nAssets Folder: %s\nGame: %s\nGame Maker Version: %d.%d\n%sSummary:\n",
 				file.getAbsolutePath(),
 				folder.getAbsolutePath(),
 				game, 
-				gamemakerVersion,
+				gameMakerVersion,
+				gameMakerMinor,
 				buildRecursiveTree(resources.getChunks())
 		));
 		sb.append(String.format("Audio Tracks: %5d\n", audio.size()));
