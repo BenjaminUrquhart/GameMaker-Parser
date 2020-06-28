@@ -1,6 +1,7 @@
 package net.benjaminurquhart.gmparser.resources;
 
 import java.awt.image.BufferedImage;
+import java.lang.ref.WeakReference;
 import java.util.Arrays;
 
 import net.benjaminurquhart.gmparser.GMDataFile;
@@ -10,12 +11,14 @@ public class SpriteResource extends Resource {
 
 	private GMDataFile dataFile;
 	
-	private BufferedImage[] frames;
+	private WeakReference<BufferedImage[]> frames;
 	private TPAGResource[] tpags;
 	private StringResource name;
 	
-	private byte[] bytes, animation;
+	private WeakReference<byte[]> animation;
+	
 	private int[] tpagOffsets;
+	private byte[] bytes;
 	
 	private int nameOffset;
 	
@@ -61,28 +64,32 @@ public class SpriteResource extends Resource {
 		return this.getFrames()[0];
 	}
 	public BufferedImage[] getFrames() {
-		if(frames == null) {
+		BufferedImage[] out = frames == null ? null : frames.get();
+		if(out == null) {
 			TPAGResource tpag;
-			frames = new BufferedImage[tpags.length];
+			out = new BufferedImage[tpags.length];
+			frames = new WeakReference<>(out);
 			
 			for(int i = 0; i < tpags.length; i++) {
 				tpag = tpags[i];
-				frames[i] = tpag.getSpriteSheet().getImage().getSubimage(tpag.getX(), tpag.getY(), tpag.getWidth(), tpag.getHeight());
+				out[i] = tpag.getSpriteSheet().getImage().getSubimage(tpag.getX(), tpag.getY(), tpag.getWidth(), tpag.getHeight());
 			}
 		}
-		return Arrays.copyOf(frames, frames.length);
-	}
-	public TPAGResource[] getTPAGInfo() {
-		return Arrays.copyOf(tpags, tpags.length);
+		return Arrays.copyOf(out, out.length);
 	}
 	public byte[] getAsGIF() {
-		if(animation == null) {
-			animation = this.getAsGIF(1);
+		byte[] bytes = animation == null ? null : animation.get();
+		if(bytes == null) {
+			bytes = this.getAsGIF(1);
+			animation = new WeakReference<>(bytes);
 		}
-		return Arrays.copyOf(animation, animation.length);
+		return Arrays.copyOf(bytes, bytes.length);
 	}
 	public byte[] getAsGIF(int scale) {
 		return GIFCreator.create(this, scale);
+	}
+	public TPAGResource[] getTPAGInfo() {
+		return Arrays.copyOf(tpags, tpags.length);
 	}
 	@Override
 	public byte[] getBytes() {

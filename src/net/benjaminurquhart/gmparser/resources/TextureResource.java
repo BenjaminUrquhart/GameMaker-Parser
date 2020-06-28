@@ -2,6 +2,7 @@ package net.benjaminurquhart.gmparser.resources;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 
 import javax.imageio.ImageIO;
 import javax.imageio.stream.ImageInputStream;
@@ -10,7 +11,7 @@ import net.benjaminurquhart.gmparser.iff.IFFChunk;
 
 public class TextureResource extends Resource {
 
-	private BufferedImage texture;
+	private WeakReference<BufferedImage> texture;
 	private String format;
 	
 	public TextureResource(IFFChunk source, int offset, int length) {
@@ -18,16 +19,17 @@ public class TextureResource extends Resource {
 	}
 	
 	public BufferedImage getImage() {
-		if(texture != null) {
-			return texture;
+		BufferedImage out = texture == null ? null : texture.get();
+		if(out == null) {
+			try {
+				out = ImageIO.read(this.getStream());
+				texture = new WeakReference<>(out);
+			}
+			catch(IOException e) {
+				e.printStackTrace();
+			}
 		}
-		try {
-			return texture = ImageIO.read(this.getStream());
-		}
-		catch(IOException e) {
-			e.printStackTrace();
-			return null;
-		}
+		return out;
 	}
 	public String getImageFormat() {
 		if(format != null) {
