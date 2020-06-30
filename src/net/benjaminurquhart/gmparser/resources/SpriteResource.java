@@ -20,17 +20,20 @@ public class SpriteResource extends Resource {
 	private int[] tpagOffsets;
 	private byte[] bytes;
 	
-	private int nameOffset;
+	private int nameOffset, width, height;
 	
 	// Sprites are a bit different than other resources
 	// Most of their data is stored within the TXTR and STRG chunks rather than the SPRT chunk
 	// As a result, they can't simply read the data from their parent chunk
-	public SpriteResource(GMDataFile dataFile, IFFChunk source, int nameOffset, int[] tpagOffsets, int offset) {
+	public SpriteResource(GMDataFile dataFile, IFFChunk source, int nameOffset, int[] tpagOffsets, int width, int height, int offset) {
 		super(source, offset, 8);
 		
 		this.tpagOffsets = tpagOffsets;
 		this.nameOffset = nameOffset;
 		this.dataFile = dataFile;
+		
+		this.height = height;
+		this.width = width;
 		
 		this.tpags = new TPAGResource[tpagOffsets.length];
 		
@@ -53,6 +56,12 @@ public class SpriteResource extends Resource {
 			}
 			tpags[index++] = tpag;
 		}
+	}
+	public int getWidth() {
+		return width;
+	}
+	public int getHeight() {
+		return height;
 	}
 	public StringResource getName() {
 		if(name == null) {
@@ -86,7 +95,7 @@ public class SpriteResource extends Resource {
 		return Arrays.copyOf(bytes, bytes.length);
 	}
 	public byte[] getAsGIF(int scale) {
-		return GIFCreator.create(this, scale);
+		return new GIFBuilder(this).setScale(scale).build();
 	}
 	public TPAGResource[] getTPAGInfo() {
 		return Arrays.copyOf(tpags, tpags.length);

@@ -122,6 +122,8 @@ public class GMDataFile {
 			initAudio();
 			initAudioGroups();
 			initSoundMetadata();
+			
+			textures.forEach(TextureResource::allowGC);
 		}
 		catch(RuntimeException e) {
 			System.err.printf("Error while processing game '%s' (GM Version %d.%d)\n", game, gameMakerVersion, gameMakerMinor);
@@ -276,7 +278,7 @@ public class GMDataFile {
 		spriteTable = new HashMap<>();
 		sprites = new ArrayList<>();
 		
-		int num = spriteChunk.readInt(0), offset, relativeOffset, nameOffset = -1;
+		int num = spriteChunk.readInt(0), offset, relativeOffset, width, height, nameOffset = -1;
 		int[] tpagOffsets;
 		
 		int tpagTableOffset = 56;
@@ -290,6 +292,8 @@ public class GMDataFile {
 			try {
 				nameOffset = spriteChunk.readInt(relativeOffset);
 				
+				width = spriteChunk.readInt(relativeOffset+4);
+				height = spriteChunk.readInt(relativeOffset+8);
 				// GameMaker 2.3 puts an extra byte in the sprite data, meaning we have to find
 				// a new TPAG offset. Thanks.
 				if(!foundRealTPAG) {
@@ -310,7 +314,7 @@ public class GMDataFile {
 					tpagOffsets[j] = spriteChunk.readInt(relativeOffset+tpagTableOffset+4*(j+1));
 					//System.out.printf("0x%08x\n", tpagOffsets[j]);
 				}
-				resource = new SpriteResource(this, spriteChunk, nameOffset, tpagOffsets, relativeOffset);
+				resource = new SpriteResource(this, spriteChunk, nameOffset, tpagOffsets, width, height, relativeOffset);
 				spriteTable.put(resource.getName().getString(), resource);
 				objectTable.put((long)offset, resource);
 				sprites.add(resource);

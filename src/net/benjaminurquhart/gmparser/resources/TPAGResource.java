@@ -7,7 +7,7 @@ import net.benjaminurquhart.gmparser.iff.IFFChunk;
 
 public class TPAGResource extends Resource {
 
-	private int x, y, width, height;
+	private int x, y, renderX, renderY, width, height;
 	private TextureResource sheet;
 	
 	public TPAGResource(GMDataFile dataFile, IFFChunk source, int offset) {
@@ -15,6 +15,7 @@ public class TPAGResource extends Resource {
 		
 		byte[] bytes = this.getBytes();
 		int coords = source.readInt(offset);
+		int render = source.readInt(offset+8);
 		int dimensions = source.readInt(offset+4);
 		int sheetIndex = (bytes[21]<<8)|bytes[20];
 		
@@ -22,6 +23,9 @@ public class TPAGResource extends Resource {
 		this.y = (coords>>16)&0xffff;
 		this.width = dimensions&0xffff;
 		this.height = (dimensions>>16)&0xffff;
+		
+		this.renderX = render&0xffff;
+		this.renderY = (render>>16)%0xffff;
 		
 		//System.out.printf("0x%04x\n", sheetIndex);
 		//sheetIndex = ((sheetIndex&0xff)<<8)|(sheetIndex>>8);
@@ -75,6 +79,12 @@ public class TPAGResource extends Resource {
 	}
 	public int getHeight() {
 		return height;
+	}
+	public int getRenderX() {
+		return renderX;
+	}
+	public int getRenderY() {
+		return renderY;
 	}
 	public TextureResource getSpriteSheet() {
 		return sheet;

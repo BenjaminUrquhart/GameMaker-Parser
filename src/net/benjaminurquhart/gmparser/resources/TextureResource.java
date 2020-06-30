@@ -12,6 +12,8 @@ import net.benjaminurquhart.gmparser.iff.IFFChunk;
 public class TextureResource extends Resource {
 
 	private WeakReference<BufferedImage> texture;
+	private BufferedImage tempReference;
+	private boolean allowGC;
 	private String format;
 	
 	public TextureResource(IFFChunk source, int offset, int length) {
@@ -24,6 +26,10 @@ public class TextureResource extends Resource {
 			try {
 				out = ImageIO.read(this.getStream());
 				texture = new WeakReference<>(out);
+				if(!allowGC) {
+					tempReference = out;
+					return tempReference;
+				}
 			}
 			catch(IOException e) {
 				e.printStackTrace();
@@ -46,7 +52,10 @@ public class TextureResource extends Resource {
 		}
 		return format;
 	}
-	
+	public void allowGC() {
+		this.tempReference = null;
+		this.allowGC = true;
+	}
 	@Override
 	public String toString() {
 		String dimX = "???", dimY = "???";
