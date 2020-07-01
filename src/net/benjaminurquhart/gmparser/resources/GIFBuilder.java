@@ -127,6 +127,7 @@ public class GIFBuilder {
 	        TPAGResource tpag;
 	        BufferedImage frame, bg = null;
 	        for(int i = 0, len = Math.max(frames.length, background == null ? 0 : background.length); i < len; i++) {
+	        	//System.out.println("Writing frame " + (i+1) + "/" + len);
 	        	frame = frames[i%frames.length];
 	        	
 	        	if(frame == null) {
