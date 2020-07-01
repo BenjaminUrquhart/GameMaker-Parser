@@ -633,9 +633,11 @@ public class GMDataFile {
 		if(sprite.contains(".")) {
 			sprite = sprite.substring(0, sprite.lastIndexOf("."));
 		}
-		sprite = sprite.replaceAll("_\\d+$", "");
 		if(!spriteTable.containsKey(sprite)) {
-			throw new IllegalArgumentException("Unknown sprite: " + sprite);
+			sprite = sprite.replaceAll("_\\d+$", "");
+			if(!spriteTable.containsKey(sprite)) {
+				throw new IllegalArgumentException("Unknown sprite: " + sprite);
+			}
 		}
 		return spriteTable.get(sprite);
 	}

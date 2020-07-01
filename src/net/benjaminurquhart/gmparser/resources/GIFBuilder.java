@@ -50,6 +50,10 @@ public class GIFBuilder {
 		this.frames = frames;
 		return this;
 	}
+	public GIFBuilder setFrames(SpriteResource sprite) {
+		this.sprite = sprite;
+		return this;
+	}
 	public GIFBuilder setScale(int scale) {
 		if(scale < 1) {
 			throw new IllegalArgumentException("scale " + scale + " < 1");
