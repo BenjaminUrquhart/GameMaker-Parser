@@ -80,9 +80,9 @@ public class IFFChunk {
 		if(length < 1) {
 			throw new IllegalArgumentException("Length " + length + " < 1");
 		}
-		if(!this.isWithinBounds(offset+length)) {
+		if(!this.isWithinBounds(offset) || !this.isWithinBounds(offset+length-1)) {
 			throw new IllegalArgumentException(String.format(
-					"provided offset and length extends beyond chunk boundaries (%d (0x%08x) + %d >= %d, chunk = %s)",
+					"provided offset and length extends beyond chunk boundaries (%d (0x%08x) + %d > %d, chunk = %s)",
 					offset,
 					offset,
 					length,
