@@ -1,0 +1,19 @@
+plugins {
+    id 'java'
+    id "com.github.johnrengelman.shadow" version "5.2.0"
+}
+
+sourceSets {
+	main.java.srcDirs = ['src']
+	main.resources.srcDirs = ['src']
+}
+
+repositories {
+	maven { url = 'https://oss.sonatype.org/content/repositories/snapshots' }
+	maven { url = 'https://oss.sonatype.org/content/repositories/central' }
+	mavenLocal()
+	jcenter()
+}
+
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
