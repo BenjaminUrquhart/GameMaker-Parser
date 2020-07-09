@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +38,11 @@ public class IFFFile {
 			String chunkID;
 			
 			IFFChunk chunk;
+			
+			if(stream.available() < 8 && parent == null) {
+				throw new IllegalArgumentException("Provided data source is too short to represent a valid IFF archive (" + stream.available() + " < 8)");
+			}
+			
 			while(stream.available() > 0) {
 				total = 0;
 				offset = totalRead;
@@ -45,7 +51,12 @@ public class IFFFile {
 					throw new IllegalStateException("invalid chunk ID, expected 4 bytes, got " + read);
 				}
 				totalRead+=read;
-				chunkID = new String(smallBuff);
+				chunkID = new String(smallBuff, Charset.forName("UTF-8"));
+				
+				// I'm not dealing with this
+				if(chunkID.equals("RASP")) {
+					break;
+				}
 				
 				// Technically, a FourCC with unprintable characters is allowed.
 				// However, Game Maker archives only have printable characters.
@@ -100,10 +111,10 @@ public class IFFFile {
 				chunks.add(chunk);
 			}
 		}
-		catch(IllegalStateException e) {
+		catch(IllegalStateException | IllegalArgumentException e) {
 			throw e;
 		}
-		catch(Exception e) {
+		catch(Throwable e) {
 			throw new IllegalStateException("internal exception while parsing data", e);
 		}
 		finally {

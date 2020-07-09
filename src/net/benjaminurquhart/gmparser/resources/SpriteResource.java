@@ -81,7 +81,7 @@ public class SpriteResource extends Resource {
 			
 			for(int i = 0; i < tpags.length; i++) {
 				tpag = tpags[i];
-				out[i] = tpag.getSpriteSheet().getImage().getSubimage(tpag.getX(), tpag.getY(), tpag.getWidth(), tpag.getHeight());
+				out[i] = tpag.getImage();
 			}
 		}
 		return Arrays.copyOf(out, out.length);

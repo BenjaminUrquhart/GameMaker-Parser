@@ -1,5 +1,7 @@
 package net.benjaminurquhart.gmparser.resources;
 
+import java.nio.charset.Charset;
+
 import net.benjaminurquhart.gmparser.iff.IFFChunk;
 
 public class StringResource extends Resource {
@@ -12,7 +14,7 @@ public class StringResource extends Resource {
 	
 	public String getString() {
 		if(string == null) {
-			string = new String(this.getBytes());
+			string = new String(this.getBytes(), Charset.forName("UTF-8"));
 		}
 		return string;
 	}

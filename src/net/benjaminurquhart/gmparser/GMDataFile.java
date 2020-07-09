@@ -20,7 +20,7 @@ public class GMDataFile {
 	
 	private IFFFile resources;
 	
-	private IFFChunk main, audioChunk, textureChunk, spriteChunk, tpagChunk, stringChunk, audioMetaChunk, audioGroupChunk;
+	private IFFChunk main, audioChunk, textureChunk, spriteChunk, tpagChunk, fontChunk, stringChunk, audioMetaChunk, audioGroupChunk;
 	
 	private Map<Long, StringResource> stringOffsetTable;
 	private Map<Long, TPAGResource> tpagOffsetTable;
@@ -30,6 +30,7 @@ public class GMDataFile {
 	private Map<String, AudioGroupResource> audioGroupTable;
 	private Map<String, SpriteResource> spriteTable;
 	private Map<String, AudioResource> audioTable;
+	private Map<String, FontResource> fontTable;
 	private Map<Long, Resource> objectTable;
 	
 	private List<AudioGroupResource> audioGroups;
@@ -37,11 +38,12 @@ public class GMDataFile {
 	private List<SpriteResource> sprites;
 	private List<StringResource> strings;
 	private List<AudioResource> audio;
+	private List<FontResource> fonts;
 	private List<TPAGResource> tpags;
 	
-	private long absoluteStringOffset, absoluteTextureOffset, absoluteSpriteOffset, absoluteAudioOffset, absoluteTPAGOffset, absoluteAudioMetaOffset;
+	private long absoluteStringOffset, absoluteTextureOffset, absoluteSpriteOffset, absoluteAudioOffset, absoluteTPAGOffset, absoluteFontOffset, absoluteAudioMetaOffset;
 	
-	private int gameMakerVersion = 1, gameMakerMinor = 0;
+	private int gameMakerVersion = 1, gameMakerMinor = 0, bytecodeVersion;
 	private String game = "???";
 	
 	private Set<File> audioSupplements;
@@ -82,7 +84,16 @@ public class GMDataFile {
 			this.file = file;
 			
 			resources = new IFFFile(file);
-			main = resources.getChunk("FORM");
+			
+			try {
+				main = resources.getChunk("FORM");
+			}
+			catch(IllegalArgumentException e) {
+				System.err.println("Malformed GameMaker archive");
+				System.err.println("Resource file structure:");
+				System.err.print(buildRecursiveTree(resources.getChunks()));
+				throw e;
+			}
 			
 			audioGroupChunk = main.getSubChunk("AGRP");
 			audioMetaChunk = main.getSubChunk("SOND");
@@ -90,6 +101,7 @@ public class GMDataFile {
 			spriteChunk = main.getSubChunk("SPRT");
 			stringChunk = main.getSubChunk("STRG");
 			audioChunk = main.getSubChunk("AUDO");
+			fontChunk = main.getSubChunk("FONT");
 			tpagChunk = main.getSubChunk("TPAG");
 			
 			absoluteAudioMetaOffset = getOffset(audioMetaChunk);
@@ -97,6 +109,7 @@ public class GMDataFile {
 			absoluteSpriteOffset = getOffset(spriteChunk);
 			absoluteStringOffset = getOffset(stringChunk);
 			absoluteAudioOffset = getOffset(audioChunk);
+			absoluteFontOffset = getOffset(fontChunk);
 			absoluteTPAGOffset = getOffset(tpagChunk);
 			
 			objectTable = new HashMap<>();
@@ -106,7 +119,9 @@ public class GMDataFile {
 			try {
 				IFFChunk meta = main.getSubChunk("GEN8");
 				gameMakerVersion = meta.readInt(44);
+				bytecodeVersion = meta.readByte(1);
 				gameMakerMinor = meta.readInt(48);
+				
 				
 				StringResource name = getStringFromAbsoluteOffset(meta.readInt(40));
 				game = name.getString();
@@ -118,6 +133,7 @@ public class GMDataFile {
 			initTPAG();
 			
 			initSprites();
+			initFonts();
 			
 			initAudio();
 			initAudioGroups();
@@ -460,14 +476,22 @@ public class GMDataFile {
 		List<SoundInfo> soundInfo = new ArrayList<>();
 		SoundInfo tmp;
 		
-		for(int i = 0; i < num; i++) {
+		for(int i = 0, grp; i < num; i++) {
 			tmp = new SoundInfo();
 			tmp.offset = offset = audioMetaChunk.readInt(4*(i+1));
 			tmp.relativeOffset = relativeOffset = (int)(offset-absoluteAudioMetaOffset);
 			tmp.name = getStringFromAbsoluteOffset(audioMetaChunk.readInt(relativeOffset));
 			tmp.flags = AudioResource.Flag.parse(audioMetaChunk.readInt(relativeOffset+4));
 			tmp.path = getStringFromAbsoluteOffset(audioMetaChunk.readInt(relativeOffset+12));
-			tmp.group = audioGroups.get(audioMetaChunk.readInt(relativeOffset+28));
+			
+			grp = audioMetaChunk.readInt(relativeOffset+28);
+			if(grp >= audioGroups.size()) {
+				for(int j = audioGroups.size(); j <= grp; j++) {
+					audioGroups.add(new AudioGroupResource("ANONYMOUS_"+j, 0));
+				}
+			}
+			tmp.group = audioGroups.get(grp);
+			
 			tmp.index = audioMetaChunk.readInt(relativeOffset+32);
 			soundInfo.add(tmp);
 		}
@@ -493,7 +517,7 @@ public class GMDataFile {
 				audio = this.audio.get(index++);
 			}
 			else {
-				audio = new AudioResource(null, 0, 0);
+				audio = new AudioResource(this, null, 0, 0);
 				this.audio.add(index++, audio);
 			}
 			
@@ -539,7 +563,7 @@ public class GMDataFile {
 			offset = audioChunk.readInt(4*(i+1));
 			relativeOffset = (int)(offset-absoluteAudioOffset);
 			length = audioChunk.readInt(relativeOffset);
-			resource = new AudioResource(audioChunk, relativeOffset+4, length);
+			resource = new AudioResource(this, audioChunk, relativeOffset+4, length);
 			objectTable.put((long)offset, resource);
 			audio.add(resource);
 			
@@ -587,7 +611,7 @@ public class GMDataFile {
 						offset = chunk.readInt(4*(i+1));
 						relativeOffset = (int)(offset-absoluteOffset);
 						length = chunk.readInt(relativeOffset);
-						resource = new AudioResource(chunk, relativeOffset+4, length);
+						resource = new AudioResource(this, chunk, relativeOffset+4, length);
 						audio.add(resource);
 					}
 					
@@ -600,6 +624,67 @@ public class GMDataFile {
 		catch(Exception e) {
 			
 		}
+	}
+	/*
+	 * 
+	 * 
+	 * SoonTM
+	 * 
+	 * 
+	 * 
+	 * 
+	 * 
+	 */
+	private void initFonts() {
+		fontTable = new HashMap<>();
+		fonts = new ArrayList<>();
+		
+		int num = fontChunk.readInt(0), offset, relativeOffset, fontSize, charset, antialiasing;
+		double scaleX, scaleY;
+		boolean italic, bold;
+		char start, end;
+		
+		StringResource codeName, displayName;
+		int[] glyphOffsets;
+		TPAGResource tpag;
+		FontResource font;
+		
+		for(int i = 0, tmp; i < num; i++) {
+			offset = fontChunk.readInt(4*(i+1));
+			relativeOffset = (int)(offset-absoluteFontOffset);
+			
+			codeName = this.getStringFromAbsoluteOffset(fontChunk.readInt(relativeOffset));
+			displayName = this.getStringFromAbsoluteOffset(fontChunk.readInt(relativeOffset+4));
+			
+			fontSize = fontChunk.readInt(relativeOffset+8);
+			
+			bold = fontChunk.readInt(relativeOffset+12) != 0;
+			italic = fontChunk.readInt(relativeOffset+16) != 0;
+			
+			tmp = fontChunk.readInt(relativeOffset+20);
+			start = (char)(tmp&0xffff);
+			charset = (tmp>>16)&0xff;
+			antialiasing = tmp>>24;
+			
+			end = (char)fontChunk.readInt(relativeOffset+24);
+			tpag = this.getTPAGFromAbsoluteOffset(fontChunk.readInt(relativeOffset+28));
+			
+			scaleX = Float.intBitsToFloat(fontChunk.readInt(relativeOffset+32));
+			scaleY = Float.intBitsToFloat(fontChunk.readInt(relativeOffset+36));
+			
+			glyphOffsets = new int[fontChunk.readInt(relativeOffset+40)];
+			
+			for(int j = 0; j < glyphOffsets.length; j++) {
+				glyphOffsets[j] = fontChunk.readInt(relativeOffset+44+4*j);
+			}
+			font = new FontResource(fontChunk, offset, codeName, displayName, fontSize, bold, italic, start, end, charset, antialiasing, tpag, scaleX, scaleY, glyphOffsets);
+			fontTable.put(displayName.getString(), font);
+			fontTable.put(codeName.getString(), font);
+			fonts.add(font);
+			
+			objectTable.put((long)offset, font);
+		}
+		
 	}
 	public StringResource getStringFromAbsoluteOffset(long offset) {
 		return stringOffsetTable.get(offset);
@@ -662,6 +747,9 @@ public class GMDataFile {
 	public List<AudioResource> getAudio() {
 		return Collections.unmodifiableList(audio); 
 	}
+	public List<FontResource> getFonts() {
+		return Collections.unmodifiableList(fonts);
+	}
 	public List<TPAGResource> getTPAGs() {
 		return Collections.unmodifiableList(tpags);
 	}
@@ -708,17 +796,25 @@ public class GMDataFile {
 	public boolean isMissingAudio() {
 		return missingAudio;
 	}
+	public File getAssetsFolder() {
+		return folder;
+	}
+	public File getSourceFile() {
+		return file;
+	}
 	
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append(String.format(
-				"File: %s\nAssets Folder: %s\nGame: %s\nGame Maker Version: %d.%d\n%sSummary:\n",
+				"File: %s\nAssets Folder: %s\nGame: %s\nGame Maker Version: %d.%d\nBytecode Version: 0x%02x (%d)\n%sSummary:\n",
 				file.getAbsolutePath(),
 				folder.getAbsolutePath(),
 				game, 
 				gameMakerVersion,
 				gameMakerMinor,
+				bytecodeVersion,
+				bytecodeVersion,
 				buildRecursiveTree(resources.getChunks())
 		));
 		sb.append(String.format("Audio Tracks: %5d\n", audio.size()));

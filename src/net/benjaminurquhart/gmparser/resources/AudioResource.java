@@ -13,6 +13,7 @@ import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
+import net.benjaminurquhart.gmparser.GMDataFile;
 import net.benjaminurquhart.gmparser.iff.IFFChunk;
 
 public class AudioResource extends Resource {
@@ -46,13 +47,15 @@ public class AudioResource extends Resource {
 	private byte[] bytes;
 	
 	private AudioGroupResource group;
+	private GMDataFile dataFile;
 	private String filename;
 	private String name;
 	
 	private Set<Flag> flags;
 	
-	public AudioResource(IFFChunk source, int offset, int length) {
+	public AudioResource(GMDataFile dataFile, IFFChunk source, int offset, int length) {
 		super(source, offset, length);
+		this.dataFile = dataFile;
 	}
 	
 	public void setAudioGroup(AudioGroupResource group) {
@@ -107,7 +110,7 @@ public class AudioResource extends Resource {
 			return super.getBytes();
 		}
 		if(bytes == null) {
-			File file = new File(System.getProperty("underengine.resources") + File.separator + filename);
+			File file = new File(dataFile.getAssetsFolder(), filename);
 			try(InputStream stream = new FileInputStream(file)) {
 				bytes = new byte[(int)file.length()];
 				

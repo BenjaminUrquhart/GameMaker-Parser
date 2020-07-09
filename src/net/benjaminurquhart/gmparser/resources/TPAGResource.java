@@ -1,6 +1,7 @@
 package net.benjaminurquhart.gmparser.resources;
 
 import java.awt.image.BufferedImage;
+import java.lang.ref.WeakReference;
 
 import net.benjaminurquhart.gmparser.GMDataFile;
 import net.benjaminurquhart.gmparser.iff.IFFChunk;
@@ -8,6 +9,7 @@ import net.benjaminurquhart.gmparser.iff.IFFChunk;
 public class TPAGResource extends Resource {
 
 	private int x, y, renderX, renderY, width, height;
+	private WeakReference<BufferedImage> image;
 	private TextureResource sheet;
 	
 	public TPAGResource(GMDataFile dataFile, IFFChunk source, int offset) {
@@ -85,6 +87,14 @@ public class TPAGResource extends Resource {
 	}
 	public int getRenderY() {
 		return renderY;
+	}
+	public BufferedImage getImage() {
+		BufferedImage out = image == null ? null : image.get();
+		if(out == null) {
+			out = sheet.getImage().getSubimage(x, y, width, height);
+			image = new WeakReference<>(out);
+		}
+		return out;
 	}
 	public TextureResource getSpriteSheet() {
 		return sheet;
