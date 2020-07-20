@@ -128,10 +128,13 @@ public class IFFFile {
 		return Collections.unmodifiableList(chunks);
 	}
 	public IFFChunk getChunk(String typeID) {
-		if(!chunkMap.containsKey(typeID)) {
+		if(!this.hasChunk(typeID)) {
 			throw new IllegalArgumentException("Unknown chunk: " + typeID);
 		}
 		return chunkMap.get(typeID);
+	}
+	public boolean hasChunk(String typeID) {
+		return chunkMap.containsKey(typeID);
 	}
 	@Override
 	public String toString() {

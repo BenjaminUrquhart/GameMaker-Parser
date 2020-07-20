@@ -1,6 +1,7 @@
 package net.benjaminurquhart.gmparser.resources;
 
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -155,24 +156,12 @@ public class GIFBuilder {
 	        	canvas = new BufferedImage(maxW, maxH, BufferedImage.TYPE_INT_ARGB);
 	        	graphics = canvas.createGraphics();
 	        	
-	        	if(scale > 1) {
-	        		if(bg != null) {
-	        			graphics.drawImage(bg.getScaledInstance(
-	        					bg.getWidth()*scale,
-	        					bg.getHeight()*scale,
-	        					BufferedImage.SCALE_AREA_AVERAGING
-	        			), 0, 0, null);
-	        		}
-	        		graphics.drawImage(frame.getScaledInstance(
-	        			frame.getWidth()*scale, 
-	        			frame.getHeight()*scale, 
-	        			BufferedImage.SCALE_AREA_AVERAGING
-	        		), x, y, null);
-	        	}
-	        	else {
-	        		graphics.drawImage(bg, 0, 0, null);
-	        		graphics.drawImage(frame, x, y, null);
-	        	}
+	        	graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+	        	
+        		if(bg != null) {
+        			graphics.drawImage(bg, 0, 0, bg.getWidth()*scale, bg.getHeight()*scale, null);
+        		}
+        		graphics.drawImage(frame, x, y, frame.getWidth()*scale, frame.getHeight()*scale, null);
 	        	
 	        	graphics.dispose();
 	        	

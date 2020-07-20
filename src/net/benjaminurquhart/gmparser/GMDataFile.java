@@ -87,6 +87,18 @@ public class GMDataFile {
 			
 			try {
 				main = resources.getChunk("FORM");
+				
+				if(main.hasSubChunk("AGRP")) {
+					audioGroupChunk = main.getSubChunk("AGRP");
+				}
+				
+				audioMetaChunk = main.getSubChunk("SOND");
+				textureChunk = main.getSubChunk("TXTR");
+				spriteChunk = main.getSubChunk("SPRT");
+				stringChunk = main.getSubChunk("STRG");
+				audioChunk = main.getSubChunk("AUDO");
+				fontChunk = main.getSubChunk("FONT");
+				tpagChunk = main.getSubChunk("TPAG");
 			}
 			catch(IllegalArgumentException e) {
 				System.err.println("Malformed GameMaker archive");
@@ -94,15 +106,6 @@ public class GMDataFile {
 				System.err.print(buildRecursiveTree(resources.getChunks()));
 				throw e;
 			}
-			
-			audioGroupChunk = main.getSubChunk("AGRP");
-			audioMetaChunk = main.getSubChunk("SOND");
-			textureChunk = main.getSubChunk("TXTR");
-			spriteChunk = main.getSubChunk("SPRT");
-			stringChunk = main.getSubChunk("STRG");
-			audioChunk = main.getSubChunk("AUDO");
-			fontChunk = main.getSubChunk("FONT");
-			tpagChunk = main.getSubChunk("TPAG");
 			
 			absoluteAudioMetaOffset = getOffset(audioMetaChunk);
 			absoluteTextureOffset = getOffset(textureChunk);
@@ -355,7 +358,7 @@ public class GMDataFile {
 	 * |    Offset    |   Size   |   Type   |    Description    |
 	 * |--------------------------------------------------------|
 	 * |       0      |    4     |  uint32  | Number of entries |
-	 * |      4*N     |    N     | uint32[N]|        ???        |
+	 * |      4*N     |    N     | uint32[N]|      Offsets      |
 	 * |      8*N     |    N     | uint32[N]| Group Names (STRG)|
 	 * |--------------------------------------------------------|
 	 * | Note: Can be empty. A dummy group is used in that case.|
@@ -364,6 +367,10 @@ public class GMDataFile {
 	private void initAudioGroups() {
 		audioGroupTable = new HashMap<>();
 		audioGroups = new ArrayList<>();
+		
+		if(audioGroupChunk == null) {
+			return;
+		}
 		
 		AudioGroupResource resource;
 		

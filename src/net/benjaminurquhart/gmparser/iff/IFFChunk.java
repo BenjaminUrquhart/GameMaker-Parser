@@ -68,6 +68,9 @@ public class IFFChunk {
 		}
 		return subChunks.getChunk(typeID);
 	}
+	public boolean hasSubChunk(String typeID) {
+		return subChunks != null && hasSubChunks && subChunks.hasChunk(typeID);
+	}
 	public int readInt(int offset) {
 		byte[] bytes = this.read(offset, 4, new byte[4]);
 		
