@@ -22,6 +22,19 @@ public abstract class Resource {
 		this.offset = offset;
 		this.source = source;
 	}
+	protected Resource(IFFChunk source, int offset) {
+		this(source, offset, 0);
+		this.length = -1;
+	}
+	
+	protected void updateLength(int length) {
+		if(this.length < 0) {
+			this.length = length;
+		}
+		else {
+			throw new IllegalStateException("cannot set length more than once");
+		}
+	}
 	
 	public IFFChunk getSource() {
 		return source;

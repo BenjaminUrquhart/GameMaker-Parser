@@ -3,7 +3,9 @@ package net.benjaminurquhart.gmparser;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,7 +22,7 @@ public class GMDataFile {
 	
 	private IFFFile resources;
 	
-	private IFFChunk main, audioChunk, textureChunk, spriteChunk, tpagChunk, fontChunk, stringChunk, audioMetaChunk, audioGroupChunk;
+	private IFFChunk main, audioChunk, textureChunk, spriteChunk, tpagChunk, fontChunk, roomChunk, stringChunk, objectChunk, audioMetaChunk, audioGroupChunk;
 	
 	private Map<Long, StringResource> stringOffsetTable;
 	private Map<Long, TPAGResource> tpagOffsetTable;
@@ -28,25 +30,29 @@ public class GMDataFile {
 	private Map<String, BufferedImage> rawValueCache;
 	
 	private Map<String, AudioGroupResource> audioGroupTable;
+	private Map<String, ObjectResource> objectTable;
 	private Map<String, SpriteResource> spriteTable;
 	private Map<String, AudioResource> audioTable;
+	private Map<String, RoomResource> roomTable;
 	private Map<String, FontResource> fontTable;
-	private Map<Long, Resource> objectTable;
+	private Map<Long, Resource> pointerTable;
 	
 	private List<AudioGroupResource> audioGroups;
 	private List<TextureResource> textures;
+	private List<ObjectResource> objects;
 	private List<SpriteResource> sprites;
 	private List<StringResource> strings;
 	private List<AudioResource> audio;
+	private List<RoomResource> rooms;
 	private List<FontResource> fonts;
 	private List<TPAGResource> tpags;
 	
-	private long absoluteStringOffset, absoluteTextureOffset, absoluteSpriteOffset, absoluteAudioOffset, absoluteTPAGOffset, absoluteFontOffset, absoluteAudioMetaOffset;
+	private long absoluteStringOffset, absoluteTextureOffset, absoluteSpriteOffset, absoluteAudioOffset, absoluteTPAGOffset, absoluteRoomOffset, absoluteObjectOffset, absoluteFontOffset, absoluteAudioMetaOffset;
 	
 	private int gameMakerVersion = 1, gameMakerMinor = 0, bytecodeVersion;
 	private String game = "???";
 	
-	private Set<File> audioSupplements;
+	private List<File> audioSupplements;
 	private boolean autoAudioSearch;
 	private boolean missingAudio;
 	
@@ -94,9 +100,11 @@ public class GMDataFile {
 				
 				audioMetaChunk = main.getSubChunk("SOND");
 				textureChunk = main.getSubChunk("TXTR");
+				objectChunk = main.getSubChunk("OBJT");
 				spriteChunk = main.getSubChunk("SPRT");
 				stringChunk = main.getSubChunk("STRG");
 				audioChunk = main.getSubChunk("AUDO");
+				roomChunk = main.getSubChunk("ROOM");
 				fontChunk = main.getSubChunk("FONT");
 				tpagChunk = main.getSubChunk("TPAG");
 			}
@@ -109,13 +117,15 @@ public class GMDataFile {
 			
 			absoluteAudioMetaOffset = getOffset(audioMetaChunk);
 			absoluteTextureOffset = getOffset(textureChunk);
+			absoluteObjectOffset = getOffset(objectChunk);
 			absoluteSpriteOffset = getOffset(spriteChunk);
 			absoluteStringOffset = getOffset(stringChunk);
 			absoluteAudioOffset = getOffset(audioChunk);
+			absoluteRoomOffset = getOffset(roomChunk);
 			absoluteFontOffset = getOffset(fontChunk);
 			absoluteTPAGOffset = getOffset(tpagChunk);
 			
-			objectTable = new HashMap<>();
+			pointerTable = new HashMap<>();
 			
 			initStringTable();
 			
@@ -141,6 +151,9 @@ public class GMDataFile {
 			initAudio();
 			initAudioGroups();
 			initSoundMetadata();
+			
+			initObjects();
+			initRooms();
 			
 			textures.forEach(TextureResource::allowGC);
 		}
@@ -188,7 +201,7 @@ public class GMDataFile {
 			stringLength = stringChunk.readInt(relativeOffset);
 			resource = new StringResource(stringChunk, relativeOffset+4, stringLength);
 			stringOffsetTable.put(offset+4, resource);
-			objectTable.put(offset+4, resource);
+			pointerTable.put(offset+4, resource);
 			strings.add(resource);
 		}
 	}
@@ -236,7 +249,7 @@ public class GMDataFile {
 			length = lengths.get(i);
 			relativeOffset = (int)(offset-absoluteTextureOffset);
 			resource = new TextureResource(textureChunk, relativeOffset, (int)length);
-			objectTable.put(offset, resource);
+			pointerTable.put(offset, resource);
 			textures.add(resource);
 		}
 	}
@@ -274,7 +287,7 @@ public class GMDataFile {
 			relativeOffset = (int)(offset-absoluteTPAGOffset);
 			resource = new TPAGResource(this, tpagChunk, relativeOffset);
 			tpagOffsetTable.put((long)offset, resource);
-			objectTable.put((long)offset, resource);
+			pointerTable.put((long)offset, resource);
 			tpags.add(resource);
 		}
 	}
@@ -335,7 +348,7 @@ public class GMDataFile {
 				}
 				resource = new SpriteResource(this, spriteChunk, nameOffset, tpagOffsets, width, height, relativeOffset);
 				spriteTable.put(resource.getName().getString(), resource);
-				objectTable.put((long)offset, resource);
+				pointerTable.put((long)offset, resource);
 				sprites.add(resource);
 				
 				nameOffset = -1;
@@ -571,7 +584,7 @@ public class GMDataFile {
 			relativeOffset = (int)(offset-absoluteAudioOffset);
 			length = audioChunk.readInt(relativeOffset);
 			resource = new AudioResource(this, audioChunk, relativeOffset+4, length);
-			objectTable.put((long)offset, resource);
+			pointerTable.put((long)offset, resource);
 			audio.add(resource);
 			
 			// I'm not sure if this will ever be true
@@ -585,17 +598,29 @@ public class GMDataFile {
 		}
 		
 		try {
+			final Comparator<File> comp = (a,b) -> {
+				String parsedA = a.getName().replaceAll("audiogroup(\\d+)\\.dat", "$1");
+				String parsedB = b.getName().replaceAll("audiogroup(\\d+)\\.dat", "$1");
+				
+				int valA = parsedA.matches("\\d+") ? Integer.parseInt(parsedA) : -1;
+				int valB = parsedB.matches("\\d+") ? Integer.parseInt(parsedB) : -1;;
+				
+				return valA-valB;
+			};
 			File[] files = null;
 			if(audioSupplements == null || audioSupplements.isEmpty()) {
-				files = folder.listFiles(file -> !file.isDirectory() && !file.equals(this.file));
+				files = folder.listFiles(file -> !file.isDirectory() && !file.equals(this.file) && file.getName().matches("audiogroup\\d+\\.dat"));
 			}
 			if(this.autoAudioSearch) {
-				files = new File[audioSupplements.size()];
-				files = audioSupplements.toArray(files);
+				List<File> tmp = new ArrayList<>();
+				if(files != null) tmp.addAll(Arrays.asList(files));
+				if(audioSupplements != null) tmp.addAll(audioSupplements);
+				files = tmp.toArray(new File[0]);
 			}
 			if(files == null) {
 				return;
 			}
+			Arrays.sort(files, comp);
 			IFFChunk chunk;
 			IFFFile data;
 			
@@ -610,6 +635,10 @@ public class GMDataFile {
 					catch(IllegalArgumentException e) {
 						continue;
 					}
+					if(audioSupplements == null) {
+						audioSupplements = new ArrayList<>();
+					}
+					audioSupplements.add(file);
 					absoluteOffset = getOffset(chunk);
 					
 					num = chunk.readInt(0);
@@ -621,12 +650,12 @@ public class GMDataFile {
 						resource = new AudioResource(this, chunk, relativeOffset+4, length);
 						audio.add(resource);
 					}
-					
 				}
 				catch(Exception e) {
 					
 				}
 			}
+			audioSupplements.sort(comp);
 		}
 		catch(Exception e) {
 			
@@ -684,15 +713,49 @@ public class GMDataFile {
 			for(int j = 0; j < glyphOffsets.length; j++) {
 				glyphOffsets[j] = fontChunk.readInt(relativeOffset+44+4*j);
 			}
-			font = new FontResource(fontChunk, offset, codeName, displayName, fontSize, bold, italic, start, end, charset, antialiasing, tpag, scaleX, scaleY, glyphOffsets);
+			font = new FontResource(fontChunk, relativeOffset, codeName, displayName, fontSize, bold, italic, start, end, charset, antialiasing, tpag, scaleX, scaleY, glyphOffsets);
 			fontTable.put(displayName.getString(), font);
 			fontTable.put(codeName.getString(), font);
 			fonts.add(font);
 			
-			objectTable.put((long)offset, font);
+			pointerTable.put((long)offset, font);
 		}
 		
 	}
+	
+	private void initObjects() {
+		objectTable = new HashMap<>();
+		objects = new ArrayList<>();
+		
+		int count = objectChunk.readInt(0), offset;
+		
+		ObjectResource resource;
+		for(int i = 0; i < count; i++) {
+			offset = objectChunk.readInt(4*(i+1));
+			resource = new ObjectResource(this, objectChunk, (int)(offset-absoluteObjectOffset));
+			pointerTable.put((long)offset, resource);
+			objectTable.put(resource.getName().getString(), resource);
+			objects.add(resource);
+		}
+	}
+	
+	private void initRooms() {
+		roomTable = new HashMap<>();
+		rooms = new ArrayList<>();
+		
+		int count = roomChunk.readInt(0), offset;
+		
+		RoomResource resource;
+		for(int i = 0; i < count; i++) {
+			offset = roomChunk.readInt(4*(i+1));
+			resource = new RoomResource(this, roomChunk, (int)(offset-absoluteRoomOffset));
+			pointerTable.put((long)offset, resource);
+			roomTable.put("", resource);
+			rooms.add(resource);
+		}
+		
+	}
+	
 	public StringResource getStringFromAbsoluteOffset(long offset) {
 		return stringOffsetTable.get(offset);
 	}
@@ -739,14 +802,20 @@ public class GMDataFile {
 		}
 		return audioTable.get(name);
 	}
-	public Resource getObject(long offset) {
-		return objectTable.get(offset);
+	public ObjectResource getObject(String name) {
+		return objectTable.get(name);
+	}
+	public Resource getResource(long pointer) {
+		return pointerTable.get(pointer);
 	}
 	public List<TextureResource> getTextures() {
 		return Collections.unmodifiableList(textures);
 	}
 	public List<StringResource> getStrings() {
 		return Collections.unmodifiableList(strings);
+	}
+	public List<ObjectResource> getObjects() {
+		return Collections.unmodifiableList(objects);
 	}
 	public List<SpriteResource> getSprites() {
 		return Collections.unmodifiableList(sprites);
@@ -784,9 +853,13 @@ public class GMDataFile {
 			throw new IllegalArgumentException("provided file is a directory");
 		}
 		if(audioSupplements == null) {
-			audioSupplements = new HashSet<>();
+			audioSupplements = new ArrayList<>();
 		}
-		return audioSupplements.add(file);
+		if(audioSupplements.contains(file)) {
+			return false;
+		}
+		audioSupplements.add(file);
+		return true;
 	}
 	public void setAutoAudioSearch(boolean value) {
 		this.autoAudioSearch = value;
@@ -824,7 +897,14 @@ public class GMDataFile {
 				bytecodeVersion,
 				buildRecursiveTree(resources.getChunks())
 		));
-		sb.append(String.format("Audio Tracks: %5d\n", audio.size()));
+		int supplementCount = audioSupplements == null ? 0 : audioSupplements.size();
+		sb.append(String.format("Audio Tracks: %5d (%d external groups loaded)\n", audio.size(), supplementCount));
+		
+		if(supplementCount > 0) {
+			for(File file : audioSupplements) {
+				sb.append("- " + file.getName() + "\n");
+			}
+		}
 
 		sb.append(String.format("Textures:     %5d\n", textures.size()));
 		sb.append(String.format("Sprites:      %5d\n", sprites.size()));

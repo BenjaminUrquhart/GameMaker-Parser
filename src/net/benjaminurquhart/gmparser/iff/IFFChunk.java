@@ -1,5 +1,7 @@
 package net.benjaminurquhart.gmparser.iff;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Collections;
 import java.util.List;
 
@@ -70,6 +72,11 @@ public class IFFChunk {
 	}
 	public boolean hasSubChunk(String typeID) {
 		return subChunks != null && hasSubChunks && subChunks.hasChunk(typeID);
+	}
+	public ByteBuffer asByteBuffer() {
+		ByteBuffer buff = ByteBuffer.wrap(contents);
+		buff.order(ByteOrder.LITTLE_ENDIAN);
+		return buff;
 	}
 	public int readInt(int offset) {
 		byte[] bytes = this.read(offset, 4, new byte[4]);
