@@ -1,39 +1,44 @@
 package net.benjaminurquhart.gmparser.resources;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
 
 import net.benjaminurquhart.gmparser.GMDataFile;
 import net.benjaminurquhart.gmparser.iff.IFFChunk;
 
 public class TPAGResource extends Resource {
 
-	private int x, y, renderX, renderY, width, height;
+	private int x, y, width, height, targetX, targetY, targetWidth, targetHeight, boundingWidth, boundingHeight;
 	private WeakReference<BufferedImage> image;
 	private TextureResource sheet;
 	
 	public TPAGResource(GMDataFile dataFile, IFFChunk source, int offset) {
 		super(source, offset, 22);
 		
-		byte[] bytes = this.getBytes();
-		int coords = source.readInt(offset);
-		int render = source.readInt(offset+8);
-		int dimensions = source.readInt(offset+4);
-		int sheetIndex = (bytes[21]<<8)|bytes[20];
+		ByteBuffer buff = source.asByteBuffer();
+		buff.position(offset);
 		
-		this.x = coords&0xffff;
-		this.y = (coords>>16)&0xffff;
-		this.width = dimensions&0xffff;
-		this.height = (dimensions>>16)&0xffff;
+		this.x = buff.getShort();
+		this.y = buff.getShort();
 		
-		this.renderX = render&0xffff;
-		this.renderY = (render>>16)%0xffff;
+		this.width = buff.getShort();
+		this.height = buff.getShort();
 		
-		//System.out.printf("0x%04x\n", sheetIndex);
-		//sheetIndex = ((sheetIndex&0xff)<<8)|(sheetIndex>>8);
-		//System.out.printf("0x%04x\n", sheetIndex);
+		this.targetX = buff.getShort();
+		this.targetY = buff.getShort();
 		
-		this.sheet = dataFile.getTextures().get(sheetIndex);
+		this.targetWidth = buff.getShort();
+		this.targetHeight = buff.getShort();
+		
+		this.boundingWidth = buff.getShort();
+		this.boundingHeight = buff.getShort();
+		
+		int sheetIndex = buff.getShort();
+		
+		this.sheet = sheetIndex < 0 ? null : dataFile.getTextures().get(sheetIndex);
 		
 		if(x < 0 || y < 0) {
 			StringBuilder byteStr = new StringBuilder();
@@ -42,8 +47,12 @@ public class TPAGResource extends Resource {
 			}
 			throw new IllegalStateException("Illegal sprite location: (" + x + ", " + y + "). Bytes: " + byteStr.toString().trim());
 		}
-		if(width < 0 || width < 0) {
+		if(width <= 0 || height <= 0) {
 			throw new IllegalStateException("Illegal sprite dimensions: [" + width + " x " + height + "]");
+		}
+		if(sheet == null) {
+			System.err.printf("WARNING: invalid sheet index %d for %s\n", sheetIndex, this);
+			return;
 		}
 		BufferedImage sheetImage = sheet.getImage();
 		if(x+width > sheetImage.getWidth()) {
@@ -82,16 +91,44 @@ public class TPAGResource extends Resource {
 	public int getHeight() {
 		return height;
 	}
-	public int getRenderX() {
-		return renderX;
+	public int getTargetX() {
+		return targetX;
 	}
-	public int getRenderY() {
-		return renderY;
+	public int getTargetY() {
+		return targetY;
+	}
+	public int getTargetWidth() {
+		return targetWidth;
+	}
+	public int getTargetHeight() {
+		return targetHeight;
+	}
+	public int getBoundingWidth() {
+		return boundingWidth;
+	}
+	public int getBoundingHeight() {
+		return boundingHeight;
 	}
 	public BufferedImage getImage() {
 		BufferedImage out = image == null ? null : image.get();
 		if(out == null) {
-			out = sheet.getImage().getSubimage(x, y, width, height);
+			if(sheet == null) {
+				out = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+				
+				Graphics2D graphics = out.createGraphics();
+				graphics.setColor(Color.BLACK);
+				graphics.fillRect(0, height/2, width/2, height/2);
+				graphics.fillRect(width/2, 0,  width/2, height/2);
+				
+				graphics.setColor(Color.MAGENTA);
+				graphics.fillRect(0, 0, width/2, height/2);
+				graphics.fillRect(width/2, height/2,  width/2, height/2);
+				
+				graphics.dispose();
+			}
+			else {
+				out = sheet.getImage().getSubimage(x, y, width, height);
+			}
 			image = new WeakReference<>(out);
 		}
 		return out;
@@ -103,11 +140,18 @@ public class TPAGResource extends Resource {
 	@Override
 	public String toString() {
 		return String.format(
-				"TPAGResource [coords=[%d, %d], dim=(%d x %d), sheet=%s]",
+				"TPAGResource @ 0x%08x [coords=[%d, %d], dim=(%d x %d), target=([%d, %d], %d x %d), bounds=(%d x %d), sheet=%s]",
+				this.getOffset()+this.getSource().getOffset()+8,
 				x,
 				y,
 				width,
 				height,
+				targetX,
+				targetY,
+				targetWidth,
+				targetHeight,
+				boundingWidth,
+				boundingHeight,
 				sheet
 		);
 	}

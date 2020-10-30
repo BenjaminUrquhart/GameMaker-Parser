@@ -55,6 +55,7 @@ public class IFFFile {
 				
 				// I'm not dealing with this
 				if(chunkID.equals("RASP")) {
+					System.err.println("Found RASP chunk, exiting early");
 					break;
 				}
 				
@@ -97,7 +98,16 @@ public class IFFFile {
 							)
 					);
 				}
-				buff = new byte[chunkSize];
+				if(chunkSize > stream.available()) {
+					throw new IllegalStateException(String.format("invalid length for chunk '%s' (%d): chunk size exceeds remaining file size (%d)", chunkID, chunkSize, stream.available()));
+				}
+				try {
+					buff = new byte[chunkSize];
+				}
+				catch(OutOfMemoryError e) {
+					System.err.println("Chunk '" + chunkID + "' is too large! (Size: " + chunkSize + ")");
+					throw e;
+				}
 				while(total < chunkSize) {
 					read = stream.read(buff, total, chunkSize-total);
 					if(read == -1) {

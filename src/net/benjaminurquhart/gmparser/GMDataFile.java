@@ -108,7 +108,7 @@ public class GMDataFile {
 				fontChunk = main.getSubChunk("FONT");
 				tpagChunk = main.getSubChunk("TPAG");
 			}
-			catch(IllegalArgumentException e) {
+			catch(IllegalArgumentException | IllegalStateException e) {
 				System.err.println("Malformed GameMaker archive");
 				System.err.println("Resource file structure:");
 				System.err.print(buildRecursiveTree(resources.getChunks()));
@@ -135,6 +135,10 @@ public class GMDataFile {
 				bytecodeVersion = meta.readByte(1);
 				gameMakerMinor = meta.readInt(48);
 				
+				if(gameMakerMinor == 0 && main.hasSubChunk("ARCV") && main.hasSubChunk("SEQN")) {
+					gameMakerMinor = 3;
+				}
+				
 				
 				StringResource name = getStringFromAbsoluteOffset(meta.readInt(40));
 				game = name.getString();
@@ -146,7 +150,14 @@ public class GMDataFile {
 			initTPAG();
 			
 			initSprites();
-			initFonts();
+			
+			try {
+				initFonts();
+			}
+			catch(Exception e) {
+				System.err.println("WARNING: Failed to parse fonts:");
+				e.printStackTrace();
+			}
 			
 			initAudio();
 			initAudioGroups();
@@ -289,6 +300,8 @@ public class GMDataFile {
 			tpagOffsetTable.put((long)offset, resource);
 			pointerTable.put((long)offset, resource);
 			tpags.add(resource);
+			
+			//System.out.println(resource);
 		}
 	}
 	
@@ -357,13 +370,14 @@ public class GMDataFile {
 				StringResource name = getStringFromAbsoluteOffset(nameOffset);
 				
 				System.err.printf(
-						"Error while processing sprite at offset 0x%08x (0x%08x) (%s)\n", 
+						"Error while processing sprite at offset 0x%08x (0x%08x) (%s)\n%s\n", 
 						offset, 
 						relativeOffset, 
-						name == null ? String.format("Missing String @ 0x%08x", nameOffset) : name.getString()
+						name == null ? String.format("Missing String @ 0x%08x", nameOffset) : name.getString(),
+						e
 				);
 				
-				throw e;
+				//throw e;
 			}
 		}
 	}
@@ -528,7 +542,7 @@ public class GMDataFile {
 			group = info.group;
 			embedded = flags.contains(AudioResource.Flag.EMBEDDED) || flags.contains(AudioResource.Flag.COMPRESSED);
 			
-			if(index >= this.audio.size()) {
+			if(index >= this.audio.size() && !missingAudio) {
 				missingAudio = true;
 				break;
 			}
@@ -603,7 +617,7 @@ public class GMDataFile {
 				String parsedB = b.getName().replaceAll("audiogroup(\\d+)\\.dat", "$1");
 				
 				int valA = parsedA.matches("\\d+") ? Integer.parseInt(parsedA) : -1;
-				int valB = parsedB.matches("\\d+") ? Integer.parseInt(parsedB) : -1;;
+				int valB = parsedB.matches("\\d+") ? Integer.parseInt(parsedB) : -1;
 				
 				return valA-valB;
 			};
@@ -624,6 +638,10 @@ public class GMDataFile {
 			IFFChunk chunk;
 			IFFFile data;
 			
+			if(audioSupplements == null) {
+				audioSupplements = new ArrayList<>();
+			}
+			
 			long absoluteOffset;
 			for(File file : files) {
 				try {
@@ -634,9 +652,6 @@ public class GMDataFile {
 					}
 					catch(IllegalArgumentException e) {
 						continue;
-					}
-					if(audioSupplements == null) {
-						audioSupplements = new ArrayList<>();
 					}
 					audioSupplements.add(file);
 					absoluteOffset = getOffset(chunk);
@@ -652,13 +667,13 @@ public class GMDataFile {
 					}
 				}
 				catch(Exception e) {
-					
+					e.printStackTrace();
 				}
 			}
 			audioSupplements.sort(comp);
 		}
 		catch(Exception e) {
-			
+			e.printStackTrace();
 		}
 	}
 	/*

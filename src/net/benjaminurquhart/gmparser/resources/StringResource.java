@@ -21,10 +21,11 @@ public class StringResource extends Resource {
 	public String getParsedString() {
 		if(parsed == null) {
 			String out = this.getString();
-			parsed = out.replaceAll("\\\\[A-Z][0-9]?", "")
+			parsed = out.replaceAll("\\\\T[tsamrfupTSAMRFUP]?", "")
+						.replaceAll("\\\\[A-Z][0-9]?", "")
 						.replaceAll("\\\\\\[.\\]", "???")
 						.replaceAll("\\^\\d", "")
-						.replaceAll("/%{0,}$", "")
+						.replaceAll("/(%{0,}|\\^)$", "")
 						.replace("&", "\n");
 		}
 		return parsed;

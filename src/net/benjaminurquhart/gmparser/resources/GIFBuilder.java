@@ -145,8 +145,8 @@ public class GIFBuilder {
 	        	
 	        	if(tpags != null && tpags.length > 0) {
 	        		tpag = tpags[i%tpags.length];
-		        	x = tpag.getRenderX()*scale+offsetX;
-		        	y = tpag.getRenderY()*scale+offsetY;
+		        	x = tpag.getTargetX()*scale+offsetX;
+		        	y = tpag.getTargetY()*scale+offsetY;
 	        	}
 	        	else {
 	        		x = offsetX;

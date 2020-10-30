@@ -36,7 +36,9 @@ public class IFFChunk {
 			this.subChunks = new IFFFile(contents);
 		}
 		catch(Exception e) {
-			//e.printStackTrace();
+			if(e.getCause() instanceof OutOfMemoryError) {
+				e.printStackTrace();
+			}
 			this.hasSubChunks = false;
 		}
 	}
