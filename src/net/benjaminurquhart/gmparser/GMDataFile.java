@@ -16,6 +16,7 @@ import net.benjaminurquhart.gmparser.resources.*;
 import net.benjaminurquhart.gmparser.iff.*;
 
 // New reference document: https://pcy.ulyssis.be/undertale/unpacking-corrected
+// See SequenceResource for the SEQN chunk cause it's nowhere near documented enough to attempt to parse it here yet
 public class GMDataFile {
 	
 	private File file, folder;
@@ -66,6 +67,9 @@ public class GMDataFile {
 		this(file, null, autoAudioSearch);
 	}
 	public GMDataFile(File file, File assetsFolder, boolean autoAudioSearch) {
+		this(file, assetsFolder, autoAudioSearch, false);
+	}
+	public GMDataFile(File file, File assetsFolder, boolean autoAudioSearch, boolean forceLoad) {
 		if(file == null) {
 			throw new IllegalArgumentException("file cannot be null");
 		}
@@ -144,27 +148,121 @@ public class GMDataFile {
 				game = name.getString();
 			}
 			
-			catch(Exception e) {}
+			catch(Exception e) {
+				e.printStackTrace();
+			}
 			
-			initTextures();
-			initTPAG();
+			try {
+				initTextures();
+			}
+			catch(Exception e) {
+				if(forceLoad) {
+					System.err.println("WARNING: Failed to load TXTR");
+					e.printStackTrace();
+				}
+				else {
+					throw e;
+				}
+			}
 			
-			initSprites();
+			try {
+				initTPAG();
+			}
+			catch(Exception e) {
+				if(forceLoad) {
+					System.err.println("WARNING: Failed to load TPAG");
+					e.printStackTrace();
+				}
+				else {
+					throw e;
+				}
+			}
+
+			try {
+				initSprites();
+			}
+			catch(Exception e) {
+				if(forceLoad) {
+					System.err.println("WARNING: Failed to load SPRT");
+					e.printStackTrace();
+				}
+				else {
+					throw e;
+				}
+			}
 			
 			try {
 				initFonts();
 			}
 			catch(Exception e) {
-				System.err.println("WARNING: Failed to parse fonts:");
+				System.err.println("WARNING: Failed to load FONT");
 				e.printStackTrace();
 			}
 			
-			initAudio();
-			initAudioGroups();
-			initSoundMetadata();
+			try {
+				initAudio();
+			}
+			catch(Exception e) {
+				if(forceLoad) {
+					System.err.println("WARNING: Failed to load AUDO");
+					e.printStackTrace();
+				}
+				else {
+					throw e;
+				}
+			}
 			
-			initObjects();
-			initRooms();
+			try {
+				initAudioGroups();
+			}
+			catch(Exception e) {
+				if(forceLoad) {
+					System.err.println("WARNING: Failed to load AGRP");
+					e.printStackTrace();
+				}
+				else {
+					throw e;
+				}
+			}
+			
+			try {
+				initSoundMetadata();
+			}
+			catch(Exception e) {
+				if(forceLoad) {
+					System.err.println("WARNING: Failed to load SOND");
+					e.printStackTrace();
+				}
+				else {
+					throw e;
+				}
+			}
+			
+			try {
+				initObjects();
+			}
+			catch(Exception e) {
+				if(forceLoad) {
+					System.err.println("WARNING: Failed to load OBJT");
+					e.printStackTrace();
+				}
+				else {
+					throw e;
+				}
+			}
+			
+			try {
+				initRooms();
+			}
+			catch(Exception e) {
+				if(forceLoad) {
+					System.err.println("WARNING: Failed to load ROOM");
+					e.printStackTrace();
+				}
+				else {
+					throw e;
+				}
+			}
 			
 			textures.forEach(TextureResource::allowGC);
 		}
